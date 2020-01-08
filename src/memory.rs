@@ -1,0 +1,153 @@
+use crate::video::Video;
+use crate::utils::{bytes_to_word, word_to_bytes};
+
+pub const INTERRUPT_ADDRESS: u16 = 0xFFFF;
+pub const BIOS: [u8; 256] = [
+    0x31, 0xFE, 0xFF, 0xAF, 0x21, 0xFF, 0x9F, 0x32, 0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
+    0x11, 0x3E, 0x80, 0x32, 0xE2, 0x0C, 0x3E, 0xF3, 0xE2, 0x32, 0x3E, 0x77, 0x77, 0x3E, 0xFC, 0xE0,
+    0x47, 0x11, 0x04, 0x01, 0x21, 0x10, 0x80, 0x1A, 0xCD, 0x95, 0x00, 0xCD, 0x96, 0x00, 0x13, 0x7B,
+    0xFE, 0x34, 0x20, 0xF3, 0x11, 0xD8, 0x00, 0x06, 0x08, 0x1A, 0x13, 0x22, 0x23, 0x05, 0x20, 0xF9,
+    0x3E, 0x19, 0xEA, 0x10, 0x99, 0x21, 0x2F, 0x99, 0x0E, 0x0C, 0x3D, 0x28, 0x08, 0x32, 0x0D, 0x20,
+    0xF9, 0x2E, 0x0F, 0x18, 0xF3, 0x67, 0x3E, 0x64, 0x57, 0xE0, 0x42, 0x3E, 0x91, 0xE0, 0x40, 0x04,
+    0x1E, 0x02, 0x0E, 0x0C, 0xF0, 0x44, 0xFE, 0x90, 0x20, 0xFA, 0x0D, 0x20, 0xF7, 0x1D, 0x20, 0xF2,
+    0x0E, 0x13, 0x24, 0x7C, 0x1E, 0x83, 0xFE, 0x62, 0x28, 0x06, 0x1E, 0xC1, 0xFE, 0x64, 0x20, 0x06,
+    0x7B, 0xE2, 0x0C, 0x3E, 0x87, 0xF2, 0xF0, 0x42, 0x90, 0xE0, 0x42, 0x15, 0x20, 0xD2, 0x05, 0x20,
+    0x4F, 0x16, 0x20, 0x18, 0xCB, 0x4F, 0x06, 0x04, 0xC5, 0xCB, 0x11, 0x17, 0xC1, 0xCB, 0x11, 0x17,
+    0x05, 0x20, 0xF5, 0x22, 0x23, 0x22, 0x23, 0xC9, 0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
+    0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
+    0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
+    0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E, 0x3c, 0x42, 0xB9, 0xA5, 0xB9, 0xA5, 0x42, 0x4C,
+    0x21, 0x04, 0x01, 0x11, 0xA8, 0x00, 0x1A, 0x13, 0xBE, 0x20, 0xFE, 0x23, 0x7D, 0xFE, 0x34, 0x20,
+    0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50,
+];
+
+pub struct Memory<'a> {
+    interrupt_enable: [u8; 1],
+    internal_ram: [u8; 0x80],
+    io: [u8; 0x4C],
+    oam: [u8; 0xA0], // sprite attribute memory
+    ram: [u8; 0x2000],
+    video_ram: [u8; 0x2000],
+    rom: Vec<u8>,
+
+    pub video: &'a mut Video,
+}
+
+impl<'a> Memory<'a> {
+    pub fn load_from_file(video: &'a mut Video, file: &str) -> Self {
+        use std::io::Read;
+        let mut fs = std::fs::File::open(file).expect("Could not open file");
+        let mut rom = Vec::new();
+        fs.read_to_end(&mut rom).expect("Could not read file");
+
+        let name = match std::str::from_utf8(&rom[0x134..0x142]) {
+            Ok(name) => name.trim_end_matches('\0'),
+            Err(e) => {
+                eprintln!(
+                    "Could not load the rom name, you're probably loading an invalid cartridge"
+                );
+                panic!("{:?}", e);
+            }
+        };
+        println!("Found game: {}", name);
+
+        let mut mem_rom = Vec::with_capacity(BIOS.len() + rom.len());
+        mem_rom.extend(BIOS.iter());
+        mem_rom.extend(rom);
+
+        Memory {
+            interrupt_enable: [0],
+            internal_ram: [0u8; 0x80],
+            io: [0u8; 0x4C],
+            oam: [0u8; 0xA0],
+            ram: [0u8; 0x2000],
+            video_ram: [0u8; 0x2000],
+            rom: mem_rom,
+            video
+        }
+    }
+
+    pub fn read_byte(&self, address: u16) -> u8 {
+        let (slice, address) = self.translate_address(address);
+        slice[address]
+    }
+
+    pub fn read_word(&self, address: u16) -> u16 {
+        let high = self.read_byte(address);
+        let low = self.read_byte(address+1);
+        bytes_to_word(high, low)
+    }
+
+    pub fn write_byte(&mut self, address: u16, value: u8) {
+        let orig_address = address;
+        let (slice, address) = self.translate_address_mut(address);
+        slice[address] = value;
+
+        if is_in_vram(orig_address) && address < 0x1800{
+            todo!("Writing to vram 0x{:04X} (val {})", address, value);
+        }
+    }
+
+    pub fn write_word(&mut self, address: u16, value: u16) {
+        let (high, low) = word_to_bytes(value);
+        self.write_byte(address, high);
+        self.write_byte(address + 1, low);
+    }
+
+    fn translate_address(&self, address: u16) -> (&[u8], usize) {
+        let address = address as usize;
+        if address == 0xFFFF {
+            (&self.interrupt_enable, 0)
+        } else if address < 0xFFFF && address >= 0xFF80 {
+            (&self.internal_ram, address - 0xFF80)
+        } else if address < 0xFF4C && address >= 0xFF00 {
+            (&self.io, address - 0xFF00)
+        } else if address < 0xFEA0 && address >= 0xFE00 {
+            (&self.oam, address - 0xEF00)
+        } else if address < 0xFE00 && address >= 0xE000 {
+            (&self.ram, address - 0xE000)
+        } else if address < 0xE000 && address >= 0xC000 {
+            (&self.ram, address - 0xC000)
+        } else if address < 0xA000 && address >= 0x8000 {
+            (&self.video_ram, address - 0x8000)
+        } else if address < 0x4000 {
+            (&self.rom, address)
+        } else {
+            panic!(
+                "Tried retrieving memory address {:x} but this address is not mapped",
+                address
+            );
+        }
+    }
+
+    fn translate_address_mut(&mut self, address: u16) -> (&mut [u8], usize) {
+        let address = address as usize;
+        if address == 0xFFFF {
+            (&mut self.interrupt_enable, 0)
+        } else if address < 0xFFFF && address >= 0xFF80 {
+            (&mut self.internal_ram, address - 0xFF80)
+        } else if address < 0xFF4C && address >= 0xFF00 {
+            (&mut self.io, address - 0xFF00)
+        } else if address < 0xFEA0 && address >= 0xFE00 {
+            (&mut self.oam, address - 0xEF00)
+        } else if address < 0xFE00 && address >= 0xE000 {
+            (&mut self.ram, address - 0xE000)
+        } else if address < 0xE000 && address >= 0xC000 {
+            (&mut self.ram, address - 0xC000)
+        } else if address < 0xA000 && address >= 0x8000 {
+            (&mut self.video_ram, address - 0x8000)
+        } else if address < 0x4000 {
+            (&mut self.rom, address)
+        } else {
+            panic!(
+                "Tried retrieving memory address {:x} but this address is not mapped",
+                address
+            );
+        }
+    }
+}
+
+fn is_in_vram(address: u16) -> bool {
+    address >= 0x8000 && address <= 0x9FFF
+}
+
