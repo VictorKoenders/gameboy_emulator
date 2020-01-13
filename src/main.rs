@@ -4,6 +4,8 @@ mod opcodes;
 mod video;
 
 use std::time::{Duration, Instant};
+use video::MinifbVideo;
+use structopt::StructOpt;
 
 pub mod utils {
     pub const fn bytes_to_word(high: u8, low: u8) -> u16 {
@@ -19,13 +21,28 @@ pub mod utils {
 
 const TARGET_FPS: u64 = 30;
 
-fn main() {
-    let file = std::env::args()
-        .nth(1)
-        .expect("Missing argument: <file>.gb");
+#[derive(Debug, StructOpt)]
+#[structopt(name = "Gameboy emulator", about = "Gameboy emulator written in rust")]
+pub struct Opts {
+    /// If present, use a terminal output instead of a window
+    #[structopt(short = "t", long = "terminal")]
+    terminal: bool,
 
-    let mut video = video::Video::init();
-    let mut memory = memory::Memory::load_from_file(&mut video, &file);
+    /// The gameboy (.gb) rom that you want to play
+    #[structopt(parse(from_os_str))]
+    rom: std::path::PathBuf,
+}
+
+fn main() {
+    let opts = Opts::from_args();
+
+    let mut video: Box<dyn video::Video> = if opts.terminal {
+        Box::new(video::TerminalVideo::init())
+    } else { 
+        Box::new(MinifbVideo::init())
+    };
+
+    let mut memory = memory::Memory::load_from_file(&mut *video, &opts.rom);
     let mut cpu = cpu::Cpu::default();
 
     let mut last_frame_start = Instant::now();

@@ -4,8 +4,8 @@ use crate::memory::Memory;
 #[macro_export]
 macro_rules! unimpl_opcode {
     ($opcode:tt $($descr:tt)*) => {{
-        fn unimplemented_opcode(_memory: &mut Memory, _cpu: &mut Cpu) {
-            panic!("Not implemented: 0x{:02X} {}", $opcode, stringify!($($descr)*));
+        fn unimplemented_opcode(_memory: &mut Memory, cpu: &mut Cpu) {
+            panic!("Not implemented: ${:04X} 0x{:02X} {}", cpu.program_counter(), $opcode, stringify!($($descr)*));
         }
         (stringify!($opcode, $($descr)*), unimplemented_opcode)
     }}
@@ -17,14 +17,22 @@ mod add;
 mod cmp;
 mod jumps;
 mod loads;
+mod misc;
 mod sub;
 mod xor;
 
 pub fn execute(memory: &mut Memory, cpu: &mut Cpu) {
     let instruction = memory.read_byte(cpu.program_counter());
-    let (name, function) = INSTRUCTIONS[instruction as usize];
+    let (_name, function) = INSTRUCTIONS[instruction as usize];
 
-    println!("[${:04X}] 0x{:02X} {}", cpu.program_counter(), instruction, name);
+    if cpu.program_counter() == 0x99 {
+        println!(
+            "[${:04X}] 0x{:02X} {}",
+            cpu.program_counter(),
+            instruction,
+            _name
+        );
+    }
 
     (function)(memory, cpu);
 }
@@ -44,7 +52,7 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     ("INC bc", add::inc_bc),
     unimpl_opcode!(0x04 INC B 1 4 Z 0 H -),
     unimpl_opcode!(0x05 DEC B 1 4 Z 1 H -),
-    unimpl_opcode!(0x06 LD B,d8 2 8 - - - -),
+    ("0x06 LD B, d8", loads::ld_b_d8),
     unimpl_opcode!(0x07 RLCA 1 4 0 0 0 C),
     ("LD (a16), sp", loads::ld_ptr_a16_sp),
     unimpl_opcode!(0x09 ADD HL,BC 1 8 - 0 H C),
@@ -62,7 +70,7 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x14 INC D 1 4 Z 0 H -),
     unimpl_opcode!(0x15 DEC D 1 4 Z 1 H -),
     unimpl_opcode!(0x16 LD D,d8 2 8 - - - -),
-    unimpl_opcode!(0x17 RLA 1 4 0 0 0 C),
+    ("0x17 RLA", misc::rla),
     ("JR r8", jumps::jr_r8),
     unimpl_opcode!(0x19 ADD HL,DE 1 8 - 0 H C),
     ("LD A, (DE)", loads::ld_a_ptr_de),
@@ -121,7 +129,7 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x4C LD C,H14- - - -),
     unimpl_opcode!(0x4D LD C,L14- - - -),
     unimpl_opcode!(0x4E LD C,(HL)18- - - -),
-    unimpl_opcode!(0x4F LD C,A14- - - -),
+    ("0x4F LD C,A", loads::ld_c_a),
     // 0x5x
     unimpl_opcode!(0x50 LD D,B14- - - -),
     unimpl_opcode!(0x51 LD D,C14- - - -),
@@ -243,11 +251,11 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0xBF CP A14Z 1 H C),
     // 0xCx
     unimpl_opcode!(0xC0 RET NZ 1 20/8 - - - -),
-    unimpl_opcode!(0xC1 POP BC 1 12 - - - -),
+    ("0xC1 POP BC", misc::pop_bc),
     unimpl_opcode!(0xC2 JP NZ,a16 3 16/12 - - - -),
     ("JP a16", jumps::jp_a16),
     unimpl_opcode!(0xC4 CALL NZ,a16 3 24/12 - - - -),
-    unimpl_opcode!(0xC5 PUSH BC 1 16 - - - -),
+    ("0xC5 PUSH BC", misc::push_bc),
     unimpl_opcode!(0xC6 ADD A,d8 2 8 Z 0 H C),
     unimpl_opcode!(0xC7 RST 00H 1 16 - - - -),
     unimpl_opcode!(0xC8 RET Z 1 20/8 - - - -),

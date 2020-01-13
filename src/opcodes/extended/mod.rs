@@ -1,8 +1,9 @@
+use super::Op;
 use crate::cpu::Cpu;
 use crate::memory::Memory;
-use super::Op;
 
 mod bit;
+mod shift;
 
 pub fn execute(memory: &mut Memory, cpu: &mut Cpu) {
     // CB 1 4 - - - -
@@ -10,9 +11,14 @@ pub fn execute(memory: &mut Memory, cpu: &mut Cpu) {
     cpu.clock_cycles(4);
 
     let instruction = memory.read_byte(cpu.program_counter());
-    let (name, function) = INSTRUCTIONS[instruction as usize];
+    let (_name, function) = INSTRUCTIONS[instruction as usize];
 
-    println!("[${:04X}] 0x{:02X} {}", cpu.program_counter(), instruction, name);
+    /*println!(
+        "[${:04X}] 0x{:02X} {}",
+        cpu.program_counter(),
+        instruction,
+        name
+    );*/
     (function)(memory, cpu);
 }
 
@@ -34,10 +40,9 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x0D RRC L28Z 0 0 C),
     unimpl_opcode!(0x0E RRC (HL)216Z 0 0 C),
     unimpl_opcode!(0x0F RRC A28Z 0 0 C),
-
     // 0x1x
     unimpl_opcode!(0x10 RL B28Z 0 0 C),
-    unimpl_opcode!(0x11 RL C28Z 0 0 C),
+    ("0x11 RL C", shift::rl_c),
     unimpl_opcode!(0x12 RL D28Z 0 0 C),
     unimpl_opcode!(0x13 RL E28Z 0 0 C),
     unimpl_opcode!(0x14 RL H28Z 0 0 C),
@@ -52,7 +57,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x1D RR L28Z 0 0 C),
     unimpl_opcode!(0x1E RR (HL)216Z 0 0 C),
     unimpl_opcode!(0x1F RR A28Z 0 0 C),
-
     // 0x2x
     unimpl_opcode!(0x20 SLA B28Z 0 0 C),
     unimpl_opcode!(0x21 SLA C28Z 0 0 C),
@@ -70,7 +74,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x2D SRA L28Z 0 0 0),
     unimpl_opcode!(0x2E SRA (HL)216Z 0 0 0),
     unimpl_opcode!(0x2F SRA A28Z 0 0 0),
-
     // 0x3x
     unimpl_opcode!(0x30 SWAP B28Z 0 0 0),
     unimpl_opcode!(0x31 SWAP C28Z 0 0 0),
@@ -88,7 +91,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x3D SRL L28Z 0 0 C),
     unimpl_opcode!(0x3E SRL (HL)216Z 0 0 C),
     unimpl_opcode!(0x3F SRL A28Z 0 0 C),
-
     // 0x4x
     unimpl_opcode!(0x40 BIT 0,B28Z 0 1 -),
     unimpl_opcode!(0x41 BIT 0,C28Z 0 1 -),
@@ -106,7 +108,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x4D BIT 1,L28Z 0 1 -),
     unimpl_opcode!(0x4E BIT 1,(HL)216Z 0 1 -),
     unimpl_opcode!(0x4F BIT 1,A28Z 0 1 -),
-
     // 0x5x
     unimpl_opcode!(0x50 BIT 2,B28Z 0 1 -),
     unimpl_opcode!(0x51 BIT 2,C28Z 0 1 -),
@@ -124,7 +125,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x5D BIT 3,L28Z 0 1 -),
     unimpl_opcode!(0x5E BIT 3,(HL)216Z 0 1 -),
     unimpl_opcode!(0x5F BIT 3,A28Z 0 1 -),
-
     // 0x6x
     unimpl_opcode!(0x60 BIT 4,B28Z 0 1 -),
     unimpl_opcode!(0x61 BIT 4,C28Z 0 1 -),
@@ -142,7 +142,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x6D BIT 5,L28Z 0 1 -),
     unimpl_opcode!(0x6E BIT 5,(HL)216Z 0 1 -),
     unimpl_opcode!(0x6F BIT 5,A28Z 0 1 -),
-
     // 0x7x
     unimpl_opcode!(0x70 BIT 6,B28Z 0 1 -),
     unimpl_opcode!(0x71 BIT 6,C28Z 0 1 -),
@@ -160,7 +159,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x7D BIT 7,L28Z 0 1 -),
     unimpl_opcode!(0x7E BIT 7,(HL)216Z 0 1 -),
     unimpl_opcode!(0x7F BIT 7,A28Z 0 1 -),
-
     // 0x8x
     unimpl_opcode!(0x80 RES 0,B28- - - -),
     unimpl_opcode!(0x81 RES 0,C28- - - -),
@@ -178,7 +176,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x8D RES 1,L28- - - -),
     unimpl_opcode!(0x8E RES 1,(HL)216- - - -),
     unimpl_opcode!(0x8F RES 1,A28- - - -),
-
     // 0x9x
     unimpl_opcode!(0x90 RES 2,B28- - - -),
     unimpl_opcode!(0x91 RES 2,C28- - - -),
@@ -196,7 +193,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x9D RES 3,L28- - - -),
     unimpl_opcode!(0x9E RES 3,(HL)216- - - -),
     unimpl_opcode!(0x9F RES 3,A28- - - -),
-
     // 0xAx
     unimpl_opcode!(0xA0 RES 4,B28- - - -),
     unimpl_opcode!(0xA1 RES 4,C28- - - -),
@@ -214,7 +210,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0xAD RES 5,L28- - - -),
     unimpl_opcode!(0xAE RES 5,(HL)216- - - -),
     unimpl_opcode!(0xAF RES 5,A28- - - -),
-
     // 0xBx
     unimpl_opcode!(0xB0 RES 6,B28- - - -),
     unimpl_opcode!(0xB1 RES 6,C28- - - -),
@@ -232,7 +227,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0xBD RES 7,L28- - - -),
     unimpl_opcode!(0xBE RES 7,(HL)216- - - -),
     unimpl_opcode!(0xBF RES 7,A28- - - -),
-
     // 0xCx
     unimpl_opcode!(0xC0 SET 0,B28- - - -),
     unimpl_opcode!(0xC1 SET 0,C28- - - -),
@@ -250,7 +244,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0xCD SET 1,L28- - - -),
     unimpl_opcode!(0xCE SET 1,(HL)216- - - -),
     unimpl_opcode!(0xCF SET 1,A28- - - -),
-
     // 0xDx
     unimpl_opcode!(0xD0 SET 2,B28- - - -),
     unimpl_opcode!(0xD1 SET 2,C28- - - -),
@@ -268,7 +261,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0xDD SET 3,L28- - - -),
     unimpl_opcode!(0xDE SET 3,(HL)216- - - -),
     unimpl_opcode!(0xDF SET 3,A28- - - -),
-
     // 0xEx
     unimpl_opcode!(0xE0 SET 4,B28- - - -),
     unimpl_opcode!(0xE1 SET 4,C28- - - -),
@@ -286,7 +278,6 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0xED SET 5,L28- - - -),
     unimpl_opcode!(0xEE SET 5,(HL)216- - - -),
     unimpl_opcode!(0xEF SET 5,A28- - - -),
-
     // 0xFx
     unimpl_opcode!(0xF0 SET 6,B28- - - -),
     unimpl_opcode!(0xF1 SET 6,C28- - - -),
@@ -304,7 +295,4 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0xFD SET 7,L28- - - -),
     unimpl_opcode!(0xFE SET 7,(HL)216- - - -),
     unimpl_opcode!(0xFF SET 7,A28- - - -),
-
-
 ];
-

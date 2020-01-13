@@ -1,5 +1,5 @@
-use crate::video::Video;
 use crate::utils::{bytes_to_word, word_to_bytes};
+use crate::video::Video;
 
 pub const INTERRUPT_ADDRESS: u16 = 0xFFFF;
 pub const BIOS: [u8; 256] = [
@@ -30,11 +30,11 @@ pub struct Memory<'a> {
     video_ram: [u8; 0x2000],
     rom: Vec<u8>,
 
-    pub video: &'a mut Video,
+    pub video: &'a mut dyn Video,
 }
 
 impl<'a> Memory<'a> {
-    pub fn load_from_file(video: &'a mut Video, file: &str) -> Self {
+    pub fn load_from_file(video: &'a mut dyn Video, file: impl AsRef<std::path::Path>) -> Self {
         use std::io::Read;
         let mut fs = std::fs::File::open(file).expect("Could not open file");
         let mut rom = Vec::new();
@@ -63,7 +63,7 @@ impl<'a> Memory<'a> {
             ram: [0u8; 0x2000],
             video_ram: [0u8; 0x2000],
             rom: mem_rom,
-            video
+            video,
         }
     }
 
@@ -74,7 +74,7 @@ impl<'a> Memory<'a> {
 
     pub fn read_word(&self, address: u16) -> u16 {
         let high = self.read_byte(address);
-        let low = self.read_byte(address+1);
+        let low = self.read_byte(address + 1);
         bytes_to_word(high, low)
     }
 
@@ -83,7 +83,7 @@ impl<'a> Memory<'a> {
         let (slice, address) = self.translate_address_mut(address);
         slice[address] = value;
 
-        if is_in_vram(orig_address) && address < 0x1800{
+        if is_in_vram(orig_address) && address < 0x1800 {
             todo!("Writing to vram 0x{:04X} (val {})", address, value);
         }
     }
@@ -150,4 +150,3 @@ impl<'a> Memory<'a> {
 fn is_in_vram(address: u16) -> bool {
     address >= 0x8000 && address <= 0x9FFF
 }
-

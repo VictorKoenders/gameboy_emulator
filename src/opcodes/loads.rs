@@ -44,16 +44,6 @@ pub fn ld_c_d8(memory: &mut Memory, cpu: &mut Cpu) {
     cpu.set_c(val);
 }
 
-pub fn jp_a16(memory: &mut Memory, cpu: &mut Cpu) {
-    // JP a16 3 16 - - - -
-    cpu.clock_cycles(16);
-    cpu.increment_program_counter();
-
-    let val = memory.read_word(cpu.program_counter());
-
-    cpu.set_program_counter(val);
-}
-
 pub fn ld_ptr_a16_a(memory: &mut Memory, cpu: &mut Cpu) {
     // 0xEA LD (a16), A 3 16 - - - -
     cpu.increment_program_counter();
@@ -133,12 +123,11 @@ pub fn ld_ptr_hl_minus_a(memory: &mut Memory, cpu: &mut Cpu) {
     let val = cpu.a();
 
     cpu.set_hl(address.wrapping_sub(1));
-    println!("Writing {} to ${:04X}", val, address);
     memory.write_byte(address, val);
 }
 
 pub fn ld_ptr_c_a(memory: &mut Memory, cpu: &mut Cpu) {
-    // 0xE2 LD (C), A 1 8 - - - - 
+    // 0xE2 LD (C), A 1 8 - - - -
     cpu.increment_program_counter();
     cpu.clock_cycles(8);
 
@@ -180,4 +169,24 @@ pub fn ld_a_ptr_de(memory: &mut Memory, cpu: &mut Cpu) {
     let val = memory.read_byte(cpu.de());
     cpu.set_a(val);
 }
+
+pub fn ld_c_a(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x4F LD C, A 1 4 - - - - 
+    cpu.increment_program_counter();
+    cpu.clock_cycles(4);
+
+    cpu.set_a(cpu.c());
+}
+
+pub fn ld_b_d8(memory: &mut Memory, cpu: &mut Cpu) {
+    // 0x06 LD B, d8 2 8 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(8);
+
+    let val = memory.read_byte(cpu.program_counter());
+    cpu.increment_program_counter();
+
+    cpu.set_b(val);
+}
+
 

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::memory::Memory;
 use crate::utils::{bytes_to_word, word_to_bytes};
 
@@ -91,6 +93,10 @@ impl Cpu {
     }
     pub fn set_a(&mut self, val: u8) {
         self.a = val;
+    }
+
+    pub fn set_b(&mut self, val: u8) {
+        self.b = val;
     }
 
     pub fn set_c(&mut self, val: u8) {
@@ -230,6 +236,10 @@ impl Flags {
 
     pub fn set_subtract(&mut self) {
         self.update_subtract(true);
+    }
+
+    pub fn clear_zero(&mut self) {
+        self.update_zero(false);
     }
 
     pub fn clear_subtract(&mut self) {

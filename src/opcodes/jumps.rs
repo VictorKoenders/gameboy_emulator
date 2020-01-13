@@ -85,7 +85,6 @@ pub fn call_a16(memory: &mut Memory, cpu: &mut Cpu) {
     cpu.clock_cycles(24);
 
     let address = memory.read_word(cpu.program_counter());
-    println!("Jumping to ${:04X}", address);
     cpu.increment_program_counter();
 
     cpu.push_stack(memory, cpu.program_counter());
@@ -98,8 +97,7 @@ pub fn jp_a16(memory: &mut Memory, cpu: &mut Cpu) {
     cpu.increment_program_counter();
 
     let address = memory.read_word(cpu.program_counter());
-    cpu.increment_program_counter();
-    cpu.increment_program_counter();
 
     cpu.set_program_counter(address);
 }
+
