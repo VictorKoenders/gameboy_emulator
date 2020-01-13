@@ -4,11 +4,6 @@ mod terminal;
 pub use self::minifb::MinifbVideo;
 pub use self::terminal::TerminalVideo;
 
-pub trait Video {
-    fn is_running(&self) -> bool;
-    fn render(&mut self);
-}
-
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Color {

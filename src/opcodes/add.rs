@@ -1,5 +1,5 @@
-use crate::cpu::Cpu;
-use crate::memory::Memory;
+use crate::Cpu;
+use crate::Memory;
 
 pub fn add_a_e(_: &mut Memory, cpu: &mut Cpu) {
     // ADD A,E 1 4 Z 0 H C
@@ -37,7 +37,7 @@ pub fn inc_c(_: &mut Memory, cpu: &mut Cpu) {
 
     let val = cpu.c();
     cpu.flags.clear_subtract();
-    if val == std::u8::MAX {
+    if val == core::u8::MAX {
         cpu.flags.set_zero();
         cpu.flags.clear_half_carry();
         cpu.set_c(0);

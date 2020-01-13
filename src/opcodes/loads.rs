@@ -1,5 +1,5 @@
-use crate::cpu::Cpu;
-use crate::memory::Memory;
+use crate::Cpu;
+use crate::Memory;
 
 pub fn ld_h_ptr_hl(memory: &mut Memory, cpu: &mut Cpu) {
     // 0x66 LD H,(HL) 1 8 - - - -
@@ -171,7 +171,7 @@ pub fn ld_a_ptr_de(memory: &mut Memory, cpu: &mut Cpu) {
 }
 
 pub fn ld_c_a(_: &mut Memory, cpu: &mut Cpu) {
-    // 0x4F LD C, A 1 4 - - - - 
+    // 0x4F LD C, A 1 4 - - - -
     cpu.increment_program_counter();
     cpu.clock_cycles(4);
 
@@ -188,5 +188,3 @@ pub fn ld_b_d8(memory: &mut Memory, cpu: &mut Cpu) {
 
     cpu.set_b(val);
 }
-
-

@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use crate::memory::Memory;
-use crate::utils::{bytes_to_word, word_to_bytes};
 
 pub struct Cpu {
     a: u8,
@@ -162,20 +161,6 @@ impl Cpu {
         self.flags.update_carry(self.a < val);
     }
 
-    pub fn dump(&self) {
-        println!("af = [0x{a:02X}, 0x{f:02X}], bc = [0x{b:02X}, 0x{c:02X}], de = [0x{d:02X}, 0x{e:02X}], hl = [0x{h:02x}, 0x{l:02X}], sp = 0x{sp:04X}, pc = 0x{pc:04X}",
-                 a = self.a,
-                 b = self.b,
-                 c = self.c,
-                 d = self.d,
-                 e = self.e,
-                 f = self.f,
-                 h = self.h,
-                 l = self.l,
-                 sp = self.sp,
-                 pc = self.pc);
-    }
-
     pub fn pop_stack(&mut self, memory: &mut Memory) -> u16 {
         self.sp += 2;
         memory.read_word(self.sp)
@@ -219,11 +204,7 @@ impl Flags {
     }
 
     fn update(&mut self, mask: u8, set: bool) {
-        if set {
-            self.0 = self.0 | mask;
-        } else {
-            self.0 = self.0 & !mask;
-        }
+        self.0 = if set { self.0 | mask } else { self.0 & !mask };
     }
 
     pub fn set_zero(&mut self) {
@@ -269,4 +250,14 @@ impl Flags {
     pub fn update_carry(&mut self, carry: bool) {
         self.update(BITMASK_CARRY, carry);
     }
+}
+
+const fn bytes_to_word(high: u8, low: u8) -> u16 {
+    (low as u16) << 8 | (high as u16)
+}
+
+const fn word_to_bytes(word: u16) -> (u8, u8) {
+    let high = (word >> 8) as u8;
+    let low = word as u8;
+    (low, high)
 }

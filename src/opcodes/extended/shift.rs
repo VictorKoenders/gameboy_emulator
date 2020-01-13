@@ -1,5 +1,5 @@
-use crate::memory::Memory;
-use crate::cpu::Cpu;
+use crate::Cpu;
+use crate::Memory;
 
 pub fn rl_c(_: &mut Memory, cpu: &mut Cpu) {
     // 0x11 RL C 1 4 Z 0 0 C
@@ -23,4 +23,3 @@ fn rl(cpu: &mut Cpu, val: u8) -> u8 {
 
     new_val
 }
-

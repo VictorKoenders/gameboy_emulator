@@ -1,4 +1,4 @@
-use super::Video;
+use crate::Video;
 use minifb::*;
 
 pub struct MinifbVideo {
@@ -21,7 +21,6 @@ impl MinifbVideo {
         Self { window, buffer }
     }
 }
-
 
 impl Video for MinifbVideo {
     fn is_running(&self) -> bool {

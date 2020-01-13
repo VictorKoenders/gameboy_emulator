@@ -1,5 +1,5 @@
-use crate::cpu::Cpu;
-use crate::memory::Memory;
+use crate::Cpu;
+use crate::Memory;
 
 pub fn dec_bc(_: &mut Memory, cpu: &mut Cpu) {
     // 0x0B DEC BC 1 8 - - - -

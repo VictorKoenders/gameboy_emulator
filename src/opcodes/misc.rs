@@ -1,5 +1,5 @@
-use crate::memory::Memory;
-use crate::cpu::Cpu;
+use crate::Cpu;
+use crate::Memory;
 
 pub fn push_bc(memory: &mut Memory, cpu: &mut Cpu) {
     // 0xC5 PUSH BC 1 16 - - - -
@@ -36,5 +36,3 @@ pub fn rla(_: &mut Memory, cpu: &mut Cpu) {
 
     cpu.set_a(new_val);
 }
-
-

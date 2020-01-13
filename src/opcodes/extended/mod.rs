@@ -1,6 +1,6 @@
 use super::Op;
-use crate::cpu::Cpu;
-use crate::memory::Memory;
+use crate::Cpu;
+use crate::Memory;
 
 mod bit;
 mod shift;

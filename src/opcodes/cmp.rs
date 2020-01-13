@@ -1,5 +1,5 @@
-use crate::cpu::Cpu;
-use crate::memory::Memory;
+use crate::Cpu;
+use crate::Memory;
 
 pub fn cp_d8(memory: &mut Memory, cpu: &mut Cpu) {
     // CP d8 2 8 Z 1 H C

@@ -1,5 +1,7 @@
-use crate::utils::{bytes_to_word, word_to_bytes};
-use crate::video::Video;
+#![allow(dead_code)]
+
+use crate::Video;
+use core::ops::RangeInclusive;
 
 pub const INTERRUPT_ADDRESS: u16 = 0xFFFF;
 pub const BIOS: [u8; 256] = [
@@ -21,55 +23,101 @@ pub const BIOS: [u8; 256] = [
     0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50,
 ];
 
-pub struct Memory<'a> {
-    interrupt_enable: [u8; 1],
-    internal_ram: [u8; 0x80],
-    io: [u8; 0x4C],
-    oam: [u8; 0xA0], // sprite attribute memory
-    ram: [u8; 0x2000],
-    video_ram: [u8; 0x2000],
-    rom: Vec<u8>,
+struct MemMap([u8; 0x10_000]);
 
+impl MemMap {
+    pub fn new(
+        switched_bank: &[u8; CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE],
+        fixed_bank: &[u8; CARTRIDGE_ROM_FIXED_BANK_SIZE],
+    ) -> Self {
+        let mut mem = MemMap([0u8; 0x10_000]);
+        mem.0[CARTRIDGE_ROM_SWITCHABLE].copy_from_slice(switched_bank);
+        mem.0[..CARTRIDGE_ROM_FIXED_BANK_SIZE].copy_from_slice(fixed_bank);
+        mem
+    }
+}
+
+/// $FFFF Interrupt Enable Flag
+const INTERRUPT_ENABLE_FLAG: usize = 0xFFFF;
+/// $FF80-$FFFE Zero Page - 127 bytes
+const ZERO_PAGE: RangeInclusive<usize> = 0xFF80..=0xFFFE;
+/// $FF00-$FF7F Hardware I/O Registers
+const HARDWARE_IO_REGISTERS: RangeInclusive<usize> = 0xFF00..=0xFF7F;
+/// $FEA0-$FEFF Unusable Memory
+const UNUSABLE_MEMORY: RangeInclusive<usize> = 0xFEA0..=0xFEFF;
+/// $FE00-$FE9F OAM - Object Attribute Memory
+const OBJECT_ATTRIBUTE_MEMORY: RangeInclusive<usize> = 0xFE00..=0xFE9F;
+/// $E000-$FDFF Echo RAM - Reserved, Do Not Use
+const ECHO_RAM: RangeInclusive<usize> = 0xE000..=0xFDFF;
+/// $D000-$DFFF Internal RAM - Bank 1-7 (switchable - CGB only)
+const INTERNAL_RAM_BANKS: RangeInclusive<usize> = 0xD000..=0xDFFF;
+/// $C000-$CFFF Internal RAM - Bank 0 (fixed)
+const INTERNAL_RAM: RangeInclusive<usize> = 0xC000..=0xCFFF;
+/// $A000-$BFFF Cartridge RAM (If Available)
+const CARTRIDGE_RAM: RangeInclusive<usize> = 0xA000..=0xBFFF;
+/// $9C00-$9FFF BG Map Data 2
+const BG_MAP_DATA_2: RangeInclusive<usize> = 0x9C00..=0x9FFF;
+/// $9800-$9BFF BG Map Data 1
+const BG_MAP_DATA_1: RangeInclusive<usize> = 0x9800..=0x9BFF;
+/// $8000-$97FF Character RAM
+const CHARACTER_RAM: RangeInclusive<usize> = 0x4000..=0x7FFF;
+/// $4000-$7FFF Cartridge ROM - Switchable Banks 1-xx
+const CARTRIDGE_ROM_SWITCHABLE: RangeInclusive<usize> = 0x4000..=0x7FFF;
+/// $0150-$3FFF Cartridge ROM - Bank 0 (fixed)
+const CARTRIDGE_ROM_FIXED: RangeInclusive<usize> = 0x0150..=0x3FFF;
+/// $0100-$014F Cartridge Header Area
+const CARTRIDGE_HEADER_AREA: RangeInclusive<usize> = 0x0100..=0x014F;
+/// $0000-$00FF Restart and Interrupt Vectors
+const RESTART_AND_INTERRUPT_VECTORS: RangeInclusive<usize> = 0x0000..=0x00FF;
+/// $0000-$00FF BIOS_AREA
+const BIOS_AREA: RangeInclusive<usize> = 0x0000..=0x00FF;
+
+pub const CARTRIDGE_ROM_FIXED_BANK_SIZE: usize = 0x4000;
+const CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE: usize = 0x4000;
+#[test]
+fn mem_size_sanity_check() {
+    assert_eq!(BIOS.len(), BIOS_AREA.end() - BIOS_AREA.start() + 1);
+    assert_eq!(
+        CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE,
+        CARTRIDGE_ROM_SWITCHABLE.end() - CARTRIDGE_ROM_SWITCHABLE.start() + 1
+    );
+}
+pub struct Memory<'a> {
+    map: MemMap,
+    switchable_banks: &'a [[u8; CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE]],
+    bios_loaded: bool,
     pub video: &'a mut dyn Video,
 }
 
 impl<'a> Memory<'a> {
-    pub fn load_from_file(video: &'a mut dyn Video, file: impl AsRef<std::path::Path>) -> Self {
-        use std::io::Read;
-        let mut fs = std::fs::File::open(file).expect("Could not open file");
-        let mut rom = Vec::new();
-        fs.read_to_end(&mut rom).expect("Could not read file");
-
-        let name = match std::str::from_utf8(&rom[0x134..0x142]) {
-            Ok(name) => name.trim_end_matches('\0'),
-            Err(e) => {
-                eprintln!(
-                    "Could not load the rom name, you're probably loading an invalid cartridge"
-                );
-                panic!("{:?}", e);
-            }
+    pub fn new(
+        fixed_bank: [u8; CARTRIDGE_ROM_FIXED_BANK_SIZE],
+        switchable_banks: &'a [[u8; CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE]],
+        video: &'a mut dyn Video,
+    ) -> Self {
+        let switched_bank = if switchable_banks.is_empty() {
+            &[0u8; CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE]
+        } else {
+            &switchable_banks[0]
         };
-        println!("Found game: {}", name);
-
-        let mut mem_rom = Vec::with_capacity(BIOS.len() + rom.len());
-        mem_rom.extend(BIOS.iter());
-        mem_rom.extend(rom);
-
         Memory {
-            interrupt_enable: [0],
-            internal_ram: [0u8; 0x80],
-            io: [0u8; 0x4C],
-            oam: [0u8; 0xA0],
-            ram: [0u8; 0x2000],
-            video_ram: [0u8; 0x2000],
-            rom: mem_rom,
+            map: MemMap::new(switched_bank, &fixed_bank),
+            bios_loaded: true,
             video,
+            switchable_banks,
         }
     }
 
+    pub fn disable_bios(&mut self) {
+        self.bios_loaded = false;
+    }
+
     pub fn read_byte(&self, address: u16) -> u8 {
-        let (slice, address) = self.translate_address(address);
-        slice[address]
+        if self.bios_loaded && address < 0x0100 {
+            BIOS[address as usize]
+        } else {
+            self.map.0[address as usize]
+        }
     }
 
     pub fn read_word(&self, address: u16) -> u16 {
@@ -79,11 +127,13 @@ impl<'a> Memory<'a> {
     }
 
     pub fn write_byte(&mut self, address: u16, value: u8) {
-        let orig_address = address;
-        let (slice, address) = self.translate_address_mut(address);
-        slice[address] = value;
+        if self.bios_loaded && address < 0x0100 {
+            unimplemented!()
+        } else {
+            self.map.0[address as usize] = value;
+        }
 
-        if is_in_vram(orig_address) && address < 0x1800 {
+        if is_in_vram(address) {
             todo!("Writing to vram 0x{:04X} (val {})", address, value);
         }
     }
@@ -93,60 +143,18 @@ impl<'a> Memory<'a> {
         self.write_byte(address, high);
         self.write_byte(address + 1, low);
     }
-
-    fn translate_address(&self, address: u16) -> (&[u8], usize) {
-        let address = address as usize;
-        if address == 0xFFFF {
-            (&self.interrupt_enable, 0)
-        } else if address < 0xFFFF && address >= 0xFF80 {
-            (&self.internal_ram, address - 0xFF80)
-        } else if address < 0xFF4C && address >= 0xFF00 {
-            (&self.io, address - 0xFF00)
-        } else if address < 0xFEA0 && address >= 0xFE00 {
-            (&self.oam, address - 0xEF00)
-        } else if address < 0xFE00 && address >= 0xE000 {
-            (&self.ram, address - 0xE000)
-        } else if address < 0xE000 && address >= 0xC000 {
-            (&self.ram, address - 0xC000)
-        } else if address < 0xA000 && address >= 0x8000 {
-            (&self.video_ram, address - 0x8000)
-        } else if address < 0x4000 {
-            (&self.rom, address)
-        } else {
-            panic!(
-                "Tried retrieving memory address {:x} but this address is not mapped",
-                address
-            );
-        }
-    }
-
-    fn translate_address_mut(&mut self, address: u16) -> (&mut [u8], usize) {
-        let address = address as usize;
-        if address == 0xFFFF {
-            (&mut self.interrupt_enable, 0)
-        } else if address < 0xFFFF && address >= 0xFF80 {
-            (&mut self.internal_ram, address - 0xFF80)
-        } else if address < 0xFF4C && address >= 0xFF00 {
-            (&mut self.io, address - 0xFF00)
-        } else if address < 0xFEA0 && address >= 0xFE00 {
-            (&mut self.oam, address - 0xEF00)
-        } else if address < 0xFE00 && address >= 0xE000 {
-            (&mut self.ram, address - 0xE000)
-        } else if address < 0xE000 && address >= 0xC000 {
-            (&mut self.ram, address - 0xC000)
-        } else if address < 0xA000 && address >= 0x8000 {
-            (&mut self.video_ram, address - 0x8000)
-        } else if address < 0x4000 {
-            (&mut self.rom, address)
-        } else {
-            panic!(
-                "Tried retrieving memory address {:x} but this address is not mapped",
-                address
-            );
-        }
-    }
 }
 
 fn is_in_vram(address: u16) -> bool {
     address >= 0x8000 && address <= 0x9FFF
+}
+
+const fn bytes_to_word(high: u8, low: u8) -> u16 {
+    (low as u16) << 8 | (high as u16)
+}
+
+const fn word_to_bytes(word: u16) -> (u8, u8) {
+    let high = (word >> 8) as u8;
+    let low = word as u8;
+    (low, high)
 }

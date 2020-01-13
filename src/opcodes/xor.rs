@@ -1,5 +1,5 @@
-use crate::cpu::Cpu;
-use crate::memory::Memory;
+use crate::Cpu;
+use crate::Memory;
 
 pub fn xor_a(_: &mut Memory, cpu: &mut Cpu) {
     // 0xAF XOR A 1 4 Z 0 0 0

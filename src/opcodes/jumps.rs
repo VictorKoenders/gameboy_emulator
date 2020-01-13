@@ -1,5 +1,5 @@
-use crate::cpu::Cpu;
-use crate::memory::Memory;
+use crate::Cpu;
+use crate::Memory;
 
 pub fn rst_38(memory: &mut Memory, cpu: &mut Cpu) {
     // RST 38H 1 16 - - - -
@@ -100,4 +100,3 @@ pub fn jp_a16(memory: &mut Memory, cpu: &mut Cpu) {
 
     cpu.set_program_counter(address);
 }
-

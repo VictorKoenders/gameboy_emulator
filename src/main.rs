@@ -1,23 +1,12 @@
-mod cpu;
-mod memory;
-mod opcodes;
+extern crate gameboy_emulator;
+
+pub use gameboy_emulator::{cpu::Cpu, memory::Memory, Video};
+
 mod video;
 
 use std::time::{Duration, Instant};
-use video::MinifbVideo;
 use structopt::StructOpt;
-
-pub mod utils {
-    pub const fn bytes_to_word(high: u8, low: u8) -> u16 {
-        (low as u16) << 8 | (high as u16)
-    }
-
-    pub const fn word_to_bytes(word: u16) -> (u8, u8) {
-        let high = (word >> 8) as u8;
-        let low = word as u8;
-        (low, high)
-    }
-}
+use video::MinifbVideo;
 
 const TARGET_FPS: u64 = 30;
 
@@ -36,14 +25,14 @@ pub struct Opts {
 fn main() {
     let opts = Opts::from_args();
 
-    let mut video: Box<dyn video::Video> = if opts.terminal {
+    let mut video: Box<dyn Video> = if opts.terminal {
         Box::new(video::TerminalVideo::init())
-    } else { 
+    } else {
         Box::new(MinifbVideo::init())
     };
 
-    let mut memory = memory::Memory::load_from_file(&mut *video, &opts.rom);
-    let mut cpu = cpu::Cpu::default();
+    let mut memory = memory_from_file(&mut *video, &opts.rom);
+    let mut cpu = Cpu::default();
 
     let mut last_frame_start = Instant::now();
     let target_frame_time = Duration::from_millis(1000 / TARGET_FPS);
@@ -52,7 +41,7 @@ fn main() {
     memory.video.render();
 
     while memory.video.is_running() {
-        opcodes::execute(&mut memory, &mut cpu);
+        gameboy_emulator::opcodes::execute(&mut memory, &mut cpu);
 
         if cpu.frame_elapsed(TARGET_FPS) {
             println!("Update frame");
@@ -66,4 +55,25 @@ fn main() {
             last_frame_start = Instant::now();
         }
     }
+}
+
+fn memory_from_file(video: &mut dyn Video, file: impl AsRef<std::path::Path>) -> Memory {
+    use std::io::Read;
+    let mut fs = std::fs::File::open(file).expect("Could not open file");
+    let mut rom = Vec::new();
+    fs.read_to_end(&mut rom).expect("Could not read file");
+
+    let name = match std::str::from_utf8(&rom[0x134..0x142]) {
+        Ok(name) => name.trim_end_matches('\0'),
+        Err(e) => {
+            eprintln!("Could not load the rom name, you're probably loading an invalid cartridge");
+            panic!("{:?}", e);
+        }
+    };
+    println!("Found game: {} (0x{:X} bytes)", name, rom.len());
+
+    let mut fixed = [0u8; gameboy_emulator::memory::CARTRIDGE_ROM_FIXED_BANK_SIZE];
+    fixed.copy_from_slice(&rom[..gameboy_emulator::memory::CARTRIDGE_ROM_FIXED_BANK_SIZE]);
+
+    Memory::new(fixed, &[], video)
 }

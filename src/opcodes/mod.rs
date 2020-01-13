@@ -1,5 +1,5 @@
-use crate::cpu::Cpu;
-use crate::memory::Memory;
+use crate::Cpu;
+use crate::Memory;
 
 #[macro_export]
 macro_rules! unimpl_opcode {
@@ -25,16 +25,11 @@ pub fn execute(memory: &mut Memory, cpu: &mut Cpu) {
     let instruction = memory.read_byte(cpu.program_counter());
     let (_name, function) = INSTRUCTIONS[instruction as usize];
 
-    if cpu.program_counter() == 0x99 {
-        println!(
-            "[${:04X}] 0x{:02X} {}",
-            cpu.program_counter(),
-            instruction,
-            _name
-        );
-    }
-
     (function)(memory, cpu);
+
+    if cpu.program_counter() == 0x0100 {
+        memory.disable_bios();
+    }
 }
 
 pub type Op = fn(memory: &mut Memory, cpu: &mut Cpu);
