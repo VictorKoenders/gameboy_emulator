@@ -82,6 +82,7 @@ fn mem_size_sanity_check() {
         CARTRIDGE_ROM_SWITCHABLE.end() - CARTRIDGE_ROM_SWITCHABLE.start() + 1
     );
 }
+
 pub struct Memory<'a> {
     map: MemMap,
     switchable_banks: &'a [[u8; CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE]],
@@ -133,8 +134,43 @@ impl<'a> Memory<'a> {
             self.map.0[address as usize] = value;
         }
 
-        if is_in_vram(address) {
-            todo!("Writing to vram 0x{:04X} (val {})", address, value);
+        if is_in_vram(address) && address < 0x1800 {
+            // More info: https://blog.ryanlevick.com/DMG-01/public/book/graphics/tile_ram.html
+            let normalized_index = (address & 0xFFFE) as usize;
+            // First we need to get the two bytes that encode the tile row.
+            let byte1 = self.map.0[normalized_index];
+            let byte2 = self.map.0[normalized_index + 1];
+
+            // A tiles is 8 rows tall. Since each row is encoded with two bytes a tile
+            // is therefore 16 bytes in total.
+            let tile_index = address / 16;
+            // Every two bytes is a new row
+            let row_index = (address % 16) / 2;
+
+            // Now we're going to loop 8 times to get the 8 pixels that make up a given row.
+            for pixel_index in 0..8 {
+                // To determine a pixel's value we must first find the corresponding bit that encodes
+                // that pixels value:
+                // 1111_1111
+                // 0123 4567
+                //
+                // As you can see the bit that corresponds to the nth pixel is the bit in the nth
+                // position *from the left*. Bits are normally indexed from the right.
+                //
+                // To find the first pixel (a.k.a pixel 0) we find the left most bit (a.k.a bit 7). For
+                // the second pixel (a.k.a pixel 1) we first the second most left bit (a.k.a bit 6) and
+                // so on.
+                //
+                // We then create a mask with a 1 at that position and 0s everywhere else.
+                //
+                // Bitwise ANDing this mask with our bytes will leave that particular bit with its
+                // original value and every other bit with a 0.
+                let mask = 1 << (7 - pixel_index);
+                let lsb = byte1 & mask > 0;
+                let msb = byte2 & mask > 0;
+                self.video
+                    .set_tile_pixel(tile_index, row_index, pixel_index, (lsb, msb).into());
+            }
         }
     }
 

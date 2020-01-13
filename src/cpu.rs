@@ -253,11 +253,11 @@ impl Flags {
 }
 
 const fn bytes_to_word(high: u8, low: u8) -> u16 {
-    (low as u16) << 8 | (high as u16)
+    (high as u16) << 8 | (low as u16)
 }
 
 const fn word_to_bytes(word: u16) -> (u8, u8) {
     let high = (word >> 8) as u8;
     let low = word as u8;
-    (low, high)
+    (high, low)
 }

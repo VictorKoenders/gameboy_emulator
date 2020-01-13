@@ -4,11 +4,15 @@ mod terminal;
 pub use self::minifb::MinifbVideo;
 pub use self::terminal::TerminalVideo;
 
-#[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Color {
-    Black = 0b00,
-    LightGray = 0b01,
-    DarkGray = 0b10,
-    White = 0b11,
+use gameboy_emulator::Color;
+
+#[derive(Default, Clone, Copy)]
+pub struct Tile {
+    color: [[Color; 8]; 8],
+}
+
+impl Tile {
+    pub fn set(&mut self, row_index: usize, pixel_index: usize, color: Color) {
+        self.color[row_index][pixel_index] = color;
+    }
 }

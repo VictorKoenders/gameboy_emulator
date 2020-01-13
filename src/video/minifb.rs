@@ -1,9 +1,11 @@
-use crate::Video;
+use super::Tile;
+use gameboy_emulator::{Color, Video};
 use minifb::*;
 
 pub struct MinifbVideo {
     window: Window,
     buffer: Vec<u32>,
+    tiles: [Tile; 384],
 }
 
 const WIDTH: usize = 800;
@@ -18,7 +20,11 @@ impl MinifbVideo {
     pub fn init() -> Self {
         let window = Window::new("Gameboy", WIDTH, HEIGHT, WindowOptions::default()).unwrap();
         let buffer = vec![from_u8_rgb(0, 0, 0); WIDTH * HEIGHT];
-        Self { window, buffer }
+        MinifbVideo {
+            window,
+            buffer,
+            tiles: [Tile::default(); 384],
+        }
     }
 }
 
@@ -31,5 +37,15 @@ impl Video for MinifbVideo {
         self.window
             .update_with_buffer_size(&self.buffer, WIDTH, HEIGHT)
             .expect("Could not draw");
+    }
+
+    fn set_tile_pixel(
+        &mut self,
+        tile_index: u16,
+        row_index: u16,
+        pixel_index: usize,
+        color: Color,
+    ) {
+        self.tiles[tile_index as usize].set(row_index as usize, pixel_index, color);
     }
 }
