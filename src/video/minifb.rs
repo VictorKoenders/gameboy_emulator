@@ -1,36 +1,51 @@
-use super::Tile;
-use gameboy_emulator::{Color, Video};
+use gameboy_emulator::*;
 use minifb::*;
 
 pub struct MinifbVideo {
     window: Window,
     buffer: Vec<u32>,
-    tiles: [Tile; 384],
 }
 
-const WIDTH: usize = 800;
-const HEIGHT: usize = 800;
-
-fn from_u8_rgb(r: u8, g: u8, b: u8) -> u32 {
-    let (r, g, b) = (r as u32, g as u32, b as u32);
-    (r << 16) | (g << 8) | b
-}
+const WIDTH: usize = 32 * 8;
+const HEIGHT: usize = 32 * 8;
 
 impl MinifbVideo {
     pub fn init() -> Self {
-        let window = Window::new("Gameboy", WIDTH, HEIGHT, WindowOptions::default()).unwrap();
-        let buffer = vec![from_u8_rgb(0, 0, 0); WIDTH * HEIGHT];
-        MinifbVideo {
-            window,
-            buffer,
-            tiles: [Tile::default(); 384],
-        }
+        let window = Window::new(
+            "Gameboy",
+            WIDTH,
+            HEIGHT,
+            WindowOptions {
+                scale: Scale::X4,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let buffer = vec![Color::White.to_u8_rgb(); WIDTH * HEIGHT];
+        MinifbVideo { window, buffer }
     }
 }
 
 impl Video for MinifbVideo {
     fn is_running(&self) -> bool {
         self.window.is_open() && !self.window.is_key_down(Key::Escape)
+    }
+
+    fn button_state(&mut self) -> ButtonState {
+        ButtonState {
+            a: self.window.is_key_down(Key::Z),
+            b: self.window.is_key_down(Key::X),
+            start: self.window.is_key_down(Key::A),
+            select: self.window.is_key_down(Key::D),
+        }
+    }
+    fn direction_state(&mut self) -> DirectionState {
+        DirectionState {
+            up: self.window.is_key_down(Key::Up),
+            down: self.window.is_key_down(Key::Down),
+            left: self.window.is_key_down(Key::Left),
+            right: self.window.is_key_down(Key::Right),
+        }
     }
 
     fn render(&mut self) {
@@ -46,6 +61,11 @@ impl Video for MinifbVideo {
         pixel_index: usize,
         color: Color,
     ) {
-        self.tiles[tile_index as usize].set(row_index as usize, pixel_index, color);
+        let x = (tile_index % 32) * 8 + row_index;
+        let y = (tile_index / 32) * 8 + pixel_index as u16;
+
+        let index = x as usize + (y as usize * WIDTH);
+
+        self.buffer[index] = color.to_u8_rgb();
     }
 }

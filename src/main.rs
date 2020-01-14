@@ -1,14 +1,12 @@
 extern crate gameboy_emulator;
 
-pub use gameboy_emulator::{cpu::Cpu, memory::Memory, Video};
-
 mod video;
 
+use gameboy_emulator::{cpu::Cpu, memory::*, Video};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
-use video::MinifbVideo;
 
-const TARGET_FPS: u64 = 30;
+const TARGET_FPS: u32 = 30;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Gameboy emulator", about = "Gameboy emulator written in rust")]
@@ -23,25 +21,63 @@ pub struct Opts {
 }
 
 fn main() {
+    use std::io::Read;
     let opts = Opts::from_args();
 
     let mut video: Box<dyn Video> = if opts.terminal {
         Box::new(video::TerminalVideo::init())
     } else {
-        Box::new(MinifbVideo::init())
+        Box::new(video::MinifbVideo::init())
     };
 
-    let mut memory = memory_from_file(&mut *video, &opts.rom);
+    let mut fs = std::fs::File::open(opts.rom).expect("Could not open file");
+    let mut rom = Vec::new();
+    fs.read_to_end(&mut rom).expect("Could not read file");
+
+    let name = match std::str::from_utf8(&rom[0x134..0x142]) {
+        Ok(name) => name.trim_end_matches('\0'),
+        Err(e) => {
+            eprintln!("Could not load the rom name, you're probably loading an invalid cartridge");
+            panic!("{:?}", e);
+        }
+    };
+    println!("Found game: {} (0x{:X} bytes)", name, rom.len());
+
+    let mut fixed = [0u8; CARTRIDGE_ROM_FIXED_BANK_SIZE];
+    fixed.copy_from_slice(&rom[..CARTRIDGE_ROM_FIXED_BANK_SIZE]);
+
+    let switchable_banks_len =
+        (rom.len() - CARTRIDGE_ROM_FIXED_BANK_SIZE) / CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE;
+    let mut switchable_roms = Vec::with_capacity(switchable_banks_len);
+
+    for i in 0..switchable_banks_len {
+        let mut bank = [0u8; CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE];
+        let start = CARTRIDGE_ROM_FIXED_BANK_SIZE + CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE * i;
+        let end = (start + CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE).min(rom.len());
+        let len = end - start;
+        bank[..len].copy_from_slice(&rom[start..end]);
+
+        switchable_roms.push(bank);
+    }
+    println!(
+        "Loaded 1 fixed and {} switchable banks (total {} bytes)",
+        switchable_banks_len,
+        rom.len()
+    );
+
+    let mut memory = Memory::new(fixed, &switchable_roms, &mut *video);
     let mut cpu = Cpu::default();
 
     let mut last_frame_start = Instant::now();
-    let target_frame_time = Duration::from_millis(1000 / TARGET_FPS);
+    let target_frame_time = Duration::from_millis(1000 / TARGET_FPS as u64);
 
     println!("Update frame");
     memory.video.render();
 
     while memory.video.is_running() {
         gameboy_emulator::opcodes::execute(&mut memory, &mut cpu);
+
+        memory.update_scanline(&mut cpu.scanline_cycles);
 
         if cpu.frame_elapsed(TARGET_FPS) {
             println!("Update frame");
@@ -55,25 +91,4 @@ fn main() {
             last_frame_start = Instant::now();
         }
     }
-}
-
-fn memory_from_file(video: &mut dyn Video, file: impl AsRef<std::path::Path>) -> Memory {
-    use std::io::Read;
-    let mut fs = std::fs::File::open(file).expect("Could not open file");
-    let mut rom = Vec::new();
-    fs.read_to_end(&mut rom).expect("Could not read file");
-
-    let name = match std::str::from_utf8(&rom[0x134..0x142]) {
-        Ok(name) => name.trim_end_matches('\0'),
-        Err(e) => {
-            eprintln!("Could not load the rom name, you're probably loading an invalid cartridge");
-            panic!("{:?}", e);
-        }
-    };
-    println!("Found game: {} (0x{:X} bytes)", name, rom.len());
-
-    let mut fixed = [0u8; gameboy_emulator::memory::CARTRIDGE_ROM_FIXED_BANK_SIZE];
-    fixed.copy_from_slice(&rom[..gameboy_emulator::memory::CARTRIDGE_ROM_FIXED_BANK_SIZE]);
-
-    Memory::new(fixed, &[], video)
 }

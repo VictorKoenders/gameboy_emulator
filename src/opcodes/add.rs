@@ -1,5 +1,4 @@
-use crate::Cpu;
-use crate::Memory;
+use crate::{Cpu, Memory};
 
 pub fn add_a_e(_: &mut Memory, cpu: &mut Cpu) {
     // ADD A,E 1 4 Z 0 H C
@@ -63,4 +62,44 @@ pub fn adc_a_c(_: &mut Memory, cpu: &mut Cpu) {
 
     let val = cpu.c();
     cpu.add_a(val, true);
+}
+
+pub fn inc_hl(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x23 INC HL 1 8 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(8);
+    cpu.set_hl(cpu.hl().wrapping_add(1));
+}
+
+pub fn inc_de(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x13 DE HL 1 8 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(8);
+    cpu.set_de(cpu.de().wrapping_add(1));
+}
+
+pub fn inc_b(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x04 INC B 1 4 Z 0 H -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(4);
+
+    let b = cpu.b();
+    cpu.flags.update_zero(b == 0xff);
+    cpu.flags.clear_subtract();
+    cpu.flags.update_half_carry(b == 0x80);
+
+    cpu.set_b(b.wrapping_add(1));
+}
+
+pub fn inc_h(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x24 INC H 1 4 Z 0 H -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(4);
+
+    let h = cpu.h();
+    cpu.flags.update_zero(h == 0xff);
+    cpu.flags.clear_subtract();
+    cpu.flags.update_half_carry(h == 0x80);
+
+    cpu.set_h(h.wrapping_add(1));
 }

@@ -1,5 +1,4 @@
-use crate::Cpu;
-use crate::Memory;
+use crate::{Cpu, Memory};
 
 pub fn rst_38(memory: &mut Memory, cpu: &mut Cpu) {
     // RST 38H 1 16 - - - -
@@ -98,5 +97,14 @@ pub fn jp_a16(memory: &mut Memory, cpu: &mut Cpu) {
 
     let address = memory.read_word(cpu.program_counter());
 
+    cpu.set_program_counter(address);
+}
+
+pub fn ret(memory: &mut Memory, cpu: &mut Cpu) {
+    // 0xC9 RET 1 16 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(16);
+
+    let address = cpu.pop_stack(memory);
     cpu.set_program_counter(address);
 }

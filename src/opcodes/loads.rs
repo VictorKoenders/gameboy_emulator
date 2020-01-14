@@ -1,5 +1,4 @@
-use crate::Cpu;
-use crate::Memory;
+use crate::{Cpu, Memory};
 
 pub fn ld_h_ptr_hl(memory: &mut Memory, cpu: &mut Cpu) {
     // 0x66 LD H,(HL) 1 8 - - - -
@@ -80,15 +79,12 @@ pub fn ldh_a_ptr_a8(memory: &mut Memory, cpu: &mut Cpu) {
     // 0xF0 LDH A, (a8) 2 12 - - - -
     cpu.increment_program_counter();
     cpu.clock_cycles(12);
-    let r_address = memory.read_byte(cpu.program_counter()) as i8;
+    let address = memory.read_byte(cpu.program_counter());
     cpu.increment_program_counter();
 
-    let address = if r_address < 0 {
-        cpu.program_counter() - (r_address.abs() as u16)
-    } else {
-        cpu.program_counter() + r_address as u16
-    };
-    cpu.set_program_counter(address);
+    let address = 0xFF00 + (address as u16);
+    let value = memory.read_byte(address);
+    cpu.set_a(value);
 }
 
 pub fn ld_sp_d16(memory: &mut Memory, cpu: &mut Cpu) {
@@ -187,4 +183,74 @@ pub fn ld_b_d8(memory: &mut Memory, cpu: &mut Cpu) {
     cpu.increment_program_counter();
 
     cpu.set_b(val);
+}
+
+pub fn ld_ptr_hl_plus_a(memory: &mut Memory, cpu: &mut Cpu) {
+    // 0x22 LD (HL+), A 1 8 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(8);
+
+    let hl_address = cpu.hl();
+    let a = cpu.a();
+
+    memory.write_byte(hl_address, a);
+    cpu.set_hl(hl_address.wrapping_add(1));
+}
+
+pub fn ld_a_e(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x7B LD A, E 1 4 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(4);
+
+    let e = cpu.e();
+    cpu.set_a(e);
+}
+
+pub fn ld_l_d8(memory: &mut Memory, cpu: &mut Cpu) {
+    // 0x2E LD L, d8 2 8 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(8);
+
+    let val = memory.read_byte(cpu.program_counter());
+    cpu.increment_program_counter();
+
+    cpu.set_l(val);
+}
+
+pub fn ld_h_a(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x67 LD H, A 1 8 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(8);
+
+    let val = cpu.a();
+    cpu.set_h(val);
+}
+
+pub fn ld_d_a(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x57 LD D, A 1 4 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(8);
+
+    let val = cpu.a();
+    cpu.set_d(val);
+}
+
+pub fn ld_e_d8(memory: &mut Memory, cpu: &mut Cpu) {
+    // 0x1E LD E, d8 2 8 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(8);
+
+    let val = memory.read_byte(cpu.program_counter());
+    cpu.increment_program_counter();
+
+    cpu.set_e(val);
+}
+
+pub fn ld_a_h(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x7C LD A, H 1 4 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(4);
+
+    let val = cpu.h();
+    cpu.set_h(val);
 }

@@ -1,8 +1,7 @@
 mod minifb;
 mod terminal;
 
-pub use self::minifb::MinifbVideo;
-pub use self::terminal::TerminalVideo;
+pub use self::{minifb::MinifbVideo, terminal::TerminalVideo};
 
 use gameboy_emulator::Color;
 

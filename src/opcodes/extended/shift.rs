@@ -1,5 +1,4 @@
-use crate::Cpu;
-use crate::Memory;
+use crate::{Cpu, Memory};
 
 pub fn rl_c(_: &mut Memory, cpu: &mut Cpu) {
     // 0x11 RL C 1 4 Z 0 0 C

@@ -1,5 +1,4 @@
-use crate::Cpu;
-use crate::Memory;
+use crate::{Cpu, Memory};
 
 pub fn bit_7_h(_memory: &mut Memory, cpu: &mut Cpu) {
     // 0x7C BIT 7, H 1 4 z 0 1 -

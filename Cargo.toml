@@ -8,5 +8,5 @@ edition = "2018"
 minifb = "0.14"
 drawille = "0.2"
 structopt = "0.3"
-terminal_size = "0.1"
+termion = "1.5"
 

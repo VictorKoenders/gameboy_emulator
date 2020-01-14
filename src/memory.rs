@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::Video;
+use crate::{Color, Video};
 use core::ops::RangeInclusive;
 
 pub const INTERRUPT_ADDRESS: u16 = 0xFFFF;
@@ -60,7 +60,7 @@ const BG_MAP_DATA_2: RangeInclusive<usize> = 0x9C00..=0x9FFF;
 /// $9800-$9BFF BG Map Data 1
 const BG_MAP_DATA_1: RangeInclusive<usize> = 0x9800..=0x9BFF;
 /// $8000-$97FF Character RAM
-const CHARACTER_RAM: RangeInclusive<usize> = 0x4000..=0x7FFF;
+const VIDEO_RAM: RangeInclusive<usize> = 0x8000..=0x9FFF;
 /// $4000-$7FFF Cartridge ROM - Switchable Banks 1-xx
 const CARTRIDGE_ROM_SWITCHABLE: RangeInclusive<usize> = 0x4000..=0x7FFF;
 /// $0150-$3FFF Cartridge ROM - Bank 0 (fixed)
@@ -73,7 +73,18 @@ const RESTART_AND_INTERRUPT_VECTORS: RangeInclusive<usize> = 0x0000..=0x00FF;
 const BIOS_AREA: RangeInclusive<usize> = 0x0000..=0x00FF;
 
 pub const CARTRIDGE_ROM_FIXED_BANK_SIZE: usize = 0x4000;
-const CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE: usize = 0x4000;
+pub const CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE: usize = 0x4000;
+
+const REGISTER_CHANNEL_ONE_SOUND_LENGTH_WAVE_PATTERN: u16 = 0xFF11;
+const REGISTER_CHANNEL_ONE_VOLUME_ENVELOPE: u16 = 0xFF12;
+const REGISTER_CHANNEL_CONTROL: u16 = 0xFF24;
+const REGISTER_SOUND_SELECTION: u16 = 0xFF25;
+const REGISTER_SOUND_ENABLE: u16 = 0xFF26;
+const REGISTER_LCD_CONTROL: u16 = 0xFF40;
+const REGISTER_SCROLL_POSITION_Y: u16 = 0xFF42;
+const REGISTER_SCANLINE_Y: u16 = 0xFF44;
+const REGISTER_BACKGROUND_PALETTE: u16 = 0xFF47;
+
 #[test]
 fn mem_size_sanity_check() {
     assert_eq!(BIOS.len(), BIOS_AREA.end() - BIOS_AREA.start() + 1);
@@ -88,6 +99,14 @@ pub struct Memory<'a> {
     switchable_banks: &'a [[u8; CARTRIDGE_ROM_SWITCHABLE_BANK_SIZE]],
     bios_loaded: bool,
     pub video: &'a mut dyn Video,
+    scanline: ScanLine,
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
+pub enum ScanLine {
+    Oam,
+    Vram,
+    HorizontalBlank,
 }
 
 impl<'a> Memory<'a> {
@@ -106,6 +125,39 @@ impl<'a> Memory<'a> {
             bios_loaded: true,
             video,
             switchable_banks,
+            scanline: ScanLine::Oam,
+        }
+    }
+
+    pub fn update_scanline(&mut self, scanline_counter: &mut u16) {
+        match self.scanline {
+            ScanLine::Oam => {
+                if *scanline_counter >= 80 {
+                    self.scanline = ScanLine::Vram;
+                    *scanline_counter -= 80;
+                }
+            }
+            ScanLine::Vram => {
+                if *scanline_counter >= 172 {
+                    self.scanline = ScanLine::HorizontalBlank;
+                    *scanline_counter -= 172;
+                }
+            }
+            ScanLine::HorizontalBlank => {
+                if *scanline_counter >= 204 {
+                    self.scanline = ScanLine::Oam;
+                    self.increment_scanline_y();
+                    *scanline_counter -= 204;
+                }
+            }
+        }
+    }
+
+    fn increment_scanline_y(&mut self) {
+        let y = &mut self.map.0[0xff44];
+        *y += 1;
+        if *y == 154 {
+            *y = 0;
         }
     }
 
@@ -117,14 +169,22 @@ impl<'a> Memory<'a> {
         if self.bios_loaded && address < 0x0100 {
             BIOS[address as usize]
         } else {
-            self.map.0[address as usize]
-        }
-    }
+            let val = self.map.0[address as usize];
 
-    pub fn read_word(&self, address: u16) -> u16 {
-        let high = self.read_byte(address);
-        let low = self.read_byte(address + 1);
-        bytes_to_word(high, low)
+            if HARDWARE_IO_REGISTERS.contains(&(address as usize)) {
+                match address {
+                    REGISTER_SCROLL_POSITION_Y => {} // Read scroll Y
+                    REGISTER_SCANLINE_Y => {}        // Read vertical scanline
+                    _ => todo!(
+                        "Reading from hardware register 0x{:04x} (value 0x{:02X})",
+                        address,
+                        val
+                    ),
+                }
+            }
+
+            val
+        }
     }
 
     pub fn write_byte(&mut self, address: u16, value: u8) {
@@ -134,7 +194,31 @@ impl<'a> Memory<'a> {
             self.map.0[address as usize] = value;
         }
 
-        if is_in_vram(address) && address < 0x1800 {
+        if HARDWARE_IO_REGISTERS.contains(&(address as usize)) {
+            match address {
+                REGISTER_CHANNEL_ONE_SOUND_LENGTH_WAVE_PATTERN => {
+                    println!("Channel 1 {:?}", ChannelOneSoundLengthWavePattern(value))
+                }
+                REGISTER_CHANNEL_ONE_VOLUME_ENVELOPE => {
+                    println!("Channel 1 {:?}", ChannelOneVolumeEnvelope(value))
+                }
+                REGISTER_CHANNEL_CONTROL => println!("Channel control {:?}", ChannelControl(value)),
+                REGISTER_SOUND_SELECTION => println!("Sound selection {:?}", SoundSelection(value)),
+                REGISTER_SOUND_ENABLE => println!("Sound {:?}", SoundEnable(value)),
+                REGISTER_LCD_CONTROL => println!("{:?}", LcdControl(value)),
+                REGISTER_SCROLL_POSITION_Y => println!("Writing scroll position y {:?}", value),
+                REGISTER_BACKGROUND_PALETTE => {
+                    println!("Background palette {:?}", BackgroundPalette(value))
+                }
+                _ => todo!(
+                    "Writing to hardware register 0x{:04X} (value 0x{:02X})",
+                    address,
+                    value
+                ),
+            }
+        }
+
+        if VIDEO_RAM.contains(&(address as usize)) {
             // More info: https://blog.ryanlevick.com/DMG-01/public/book/graphics/tile_ram.html
             let normalized_index = (address & 0xFFFE) as usize;
             // First we need to get the two bytes that encode the tile row.
@@ -143,7 +227,7 @@ impl<'a> Memory<'a> {
 
             // A tiles is 8 rows tall. Since each row is encoded with two bytes a tile
             // is therefore 16 bytes in total.
-            let tile_index = address / 16;
+            let tile_index = (address - (*VIDEO_RAM.start() as u16)) / 16;
             // Every two bytes is a new row
             let row_index = (address % 16) / 2;
 
@@ -174,6 +258,12 @@ impl<'a> Memory<'a> {
         }
     }
 
+    pub fn read_word(&self, address: u16) -> u16 {
+        let high = self.read_byte(address);
+        let low = self.read_byte(address + 1);
+        bytes_to_word(high, low)
+    }
+
     pub fn write_word(&mut self, address: u16, value: u16) {
         let (high, low) = word_to_bytes(value);
         self.write_byte(address, high);
@@ -181,8 +271,138 @@ impl<'a> Memory<'a> {
     }
 }
 
-fn is_in_vram(address: u16) -> bool {
-    address >= 0x8000 && address <= 0x9FFF
+struct ChannelOneSoundLengthWavePattern(u8);
+
+impl core::fmt::Debug for ChannelOneSoundLengthWavePattern {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let duty = (self.0 & 0b1100_0000) >> 6;
+        let length_wave = self.0 & 0b0011_1111;
+        write!(
+            fmt,
+            "Wave duty: {}, sound length: {} seconds",
+            match duty {
+                0b00 => "12.5%",
+                0b01 => "25%",
+                0b10 => "50%",
+                0b11 => "75%",
+                _ => unreachable!(),
+            },
+            1.0 / ((64.0 - length_wave as f32) * 256.0),
+        )
+    }
+}
+
+struct ChannelOneVolumeEnvelope(u8);
+
+impl core::fmt::Debug for ChannelOneVolumeEnvelope {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let initial_volume = (self.0 & 0b0111_0000) >> 4;
+        let envelope_direction = (self.0 & 0b0000_1000) >> 3;
+        let numer_of_envelope_sweeps = self.0 & 0b0000_0111;
+
+        write!(
+            fmt,
+            "Initial volume: {}, direction: {} ({}), number of sweeps: {}",
+            initial_volume,
+            envelope_direction,
+            if envelope_direction > 0 {
+                "increase"
+            } else {
+                "decrease"
+            },
+            numer_of_envelope_sweeps
+        )
+    }
+}
+
+struct SoundEnable(u8);
+impl core::fmt::Debug for SoundEnable {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let all_sound_off = (self.0 & 0b1000_0000) > 0;
+        let sound_4_on = (self.0 & 0b0000_1000) > 0;
+        let sound_3_on = (self.0 & 0b0000_0100) > 0;
+        let sound_2_on = (self.0 & 0b0000_0010) > 0;
+        let sound_1_on = (self.0 & 0b0000_0001) > 0;
+
+        write!(
+            fmt,
+            "Sound enable: {} (4: {}, 3: {}, 2: {}, 1: {})",
+            !all_sound_off, sound_4_on, sound_3_on, sound_2_on, sound_1_on
+        )
+    }
+}
+
+struct SoundSelection(u8);
+impl core::fmt::Debug for SoundSelection {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let masks = &[
+            (0b1000_0000, "channel 4 to SO2"),
+            (0b0100_0000, "channel 3 to SO2"),
+            (0b0010_0000, "channel 2 to SO2"),
+            (0b0001_0000, "channel 1 to SO2"),
+            (0b0000_1000, "channel 4 to SO1"),
+            (0b0000_0100, "channel 3 to SO1"),
+            (0b0000_0010, "channel 2 to SO1"),
+            (0b0000_0001, "channel 1 to SO1"),
+        ];
+        let mut first = true;
+        for (mask, text) in masks {
+            if self.0 & mask > 0 {
+                if first {
+                    first = false;
+                } else {
+                    write!(fmt, ", ")?;
+                }
+                write!(fmt, "{}", text)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+struct ChannelControl(u8);
+impl core::fmt::Debug for ChannelControl {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let so2_enable = (self.0 & 0b1000_0000) > 0;
+        let so2_volume = (self.0 & 0b0111_0000) >> 4;
+        let so1_enable = (self.0 & 0b0000_1000) > 0;
+        let so1_volume = self.0 & 0b0000_0111;
+
+        if so2_enable {
+            write!(fmt, "so2: {}", so2_volume)?;
+        } else {
+            write!(fmt, "so2: disabled")?;
+        }
+        write!(fmt, ", ")?;
+        if so1_enable {
+            write!(fmt, "so1: {}", so1_volume)
+        } else {
+            write!(fmt, "so1: disabled")
+        }
+    }
+}
+
+struct BackgroundPalette(u8);
+impl core::fmt::Debug for BackgroundPalette {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        let shade_3: Color = ((self.0 & 0b1100_0000) >> 6).into();
+        let shade_2: Color = ((self.0 & 0b0011_0000) >> 4).into();
+        let shade_1: Color = ((self.0 & 0b0000_1100) >> 2).into();
+        let shade_0: Color = (self.0 & 0b0000_0011).into();
+
+        write!(
+            fmt,
+            "shade 3: {:?}, shade 2: {:?}, shade 1: {:?}, shade 0: {:?}",
+            shade_3, shade_2, shade_1, shade_0
+        )
+    }
+}
+
+struct LcdControl(u8);
+impl core::fmt::Debug for LcdControl {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write!(fmt, "LCD control {:08b}", self.0)
+    }
 }
 
 const fn bytes_to_word(high: u8, low: u8) -> u16 {

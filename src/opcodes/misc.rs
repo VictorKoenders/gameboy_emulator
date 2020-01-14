@@ -1,5 +1,4 @@
-use crate::Cpu;
-use crate::Memory;
+use crate::{Cpu, Memory};
 
 pub fn push_bc(memory: &mut Memory, cpu: &mut Cpu) {
     // 0xC5 PUSH BC 1 16 - - - -

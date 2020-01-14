@@ -15,7 +15,8 @@ pub struct Cpu {
     pc: u16,
 
     pub flags: Flags,
-    cycles: usize,
+    cycles: u32,
+    pub scanline_cycles: u16,
 }
 
 impl Default for Cpu {
@@ -32,6 +33,7 @@ impl Default for Cpu {
 
             sp: 0xFFFE,
             cycles: 0,
+            scanline_cycles: 0,
             flags: Flags(0),
             pc: 0x0,
         }
@@ -51,8 +53,9 @@ impl Cpu {
         self.pc = pc;
     }
 
-    pub fn clock_cycles(&mut self, cycles: usize) {
-        self.cycles += cycles;
+    pub fn clock_cycles(&mut self, cycles: u16) {
+        self.cycles += cycles as u32;
+        self.scanline_cycles += cycles;
     }
 
     pub fn a(&self) -> u8 {
@@ -102,6 +105,22 @@ impl Cpu {
         self.c = val;
     }
 
+    pub fn set_d(&mut self, val: u8) {
+        self.d = val;
+    }
+
+    pub fn set_e(&mut self, val: u8) {
+        self.e = val;
+    }
+
+    pub fn set_h(&mut self, val: u8) {
+        self.h = val;
+    }
+
+    pub fn set_l(&mut self, val: u8) {
+        self.l = val;
+    }
+
     pub fn set_bc(&mut self, val: u16) {
         let (b, c) = word_to_bytes(val);
         self.b = b;
@@ -123,14 +142,9 @@ impl Cpu {
         self.h = h;
         self.l = l;
     }
-
-    pub fn set_h(&mut self, val: u8) {
-        self.h = val;
-    }
-
-    pub fn frame_elapsed(&mut self, fps: u64) -> bool {
+    pub fn frame_elapsed(&mut self, fps: u32) -> bool {
         // Gameboy runs at 4_200_000 hz
-        let target_cycles = 4_200_000 / (fps as usize);
+        let target_cycles = 4_200_000 / fps;
 
         if self.cycles > target_cycles {
             self.cycles -= target_cycles;
