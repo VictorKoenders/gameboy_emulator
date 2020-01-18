@@ -2,16 +2,15 @@ use super::Tile;
 use drawille::*;
 use gameboy_emulator::*;
 use std::io::{stdout, Stdout, Write};
-use termion::terminal_size;
+use termion::{cursor::HideCursor, terminal_size};
 
 pub struct TerminalVideo {
     canvas: Canvas,
-    tiles: [Tile; 384],
-    stdout: Stdout,
+    hide_cursor: HideCursor<Stdout>,
 }
 
 const WIDTH: u32 = 160;
-const HEIGHT: u32 = 144;
+const HEIGHT: u32 = 100;
 
 const HEIGHT_CHARACTERS: u32 = HEIGHT / 4;
 const WIDTH_CHARACTERS: u32 = WIDTH / 2;
@@ -32,10 +31,18 @@ impl TerminalVideo {
         canvas.line(WIDTH, 0, WIDTH, HEIGHT);
         canvas.line(0, HEIGHT, WIDTH, HEIGHT);
 
+        let mut stdout = stdout();
+
+        writeln!(
+            stdout,
+            "{}{}",
+            termion::clear::All,
+            termion::cursor::Goto(1, 1),
+        );
+
         Self {
             canvas,
-            tiles: [Tile::default(); 384],
-            stdout: stdout(),
+            hide_cursor: HideCursor::from(stdout),
         }
     }
 }
@@ -62,8 +69,9 @@ impl Video for TerminalVideo {
         true
     }
     fn render(&mut self) {
+        let stdout: &mut Stdout = &mut *self.hide_cursor;
         writeln!(
-            self.stdout,
+            stdout,
             "{}{}{}",
             termion::clear::All,
             termion::cursor::Goto(1, 1),
@@ -78,6 +86,12 @@ impl Video for TerminalVideo {
         pixel_index: usize,
         color: Color,
     ) {
-        self.tiles[tile_index as usize].set(row_index as usize, pixel_index, color);
+        let x = ((tile_index % 32) * 8 + row_index) as u32;
+        let y = (tile_index / 32) as u32 * 8 + pixel_index as u32;
+
+        match color {
+            Color::White | Color::LightGray => self.canvas.set(x, y),
+            Color::Black | Color::DarkGray => self.canvas.unset(x, y),
+        }
     }
 }

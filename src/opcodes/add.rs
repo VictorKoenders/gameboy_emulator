@@ -64,6 +64,16 @@ pub fn adc_a_c(_: &mut Memory, cpu: &mut Cpu) {
     cpu.add_a(val, true);
 }
 
+pub fn add_a_ptr_hl(memory: &mut Memory, cpu: &mut Cpu) {
+    // 0x86 ADD A, (HL) 1 8 Z 0 H C
+    cpu.clock_cycles(4);
+    cpu.increment_program_counter();
+
+    let addr = cpu.hl();
+    let val = memory.read_byte(addr);
+    cpu.add_a(val, false);
+}
+
 pub fn inc_hl(_: &mut Memory, cpu: &mut Cpu) {
     // 0x23 INC HL 1 8 - - - -
     cpu.increment_program_counter();

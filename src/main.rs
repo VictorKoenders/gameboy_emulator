@@ -6,7 +6,7 @@ use gameboy_emulator::{cpu::Cpu, memory::*, Video};
 use std::time::{Duration, Instant};
 use structopt::StructOpt;
 
-const TARGET_FPS: u32 = 30;
+const TARGET_FPS: u32 = 60;
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "Gameboy emulator", about = "Gameboy emulator written in rust")]
@@ -14,6 +14,10 @@ pub struct Opts {
     /// If present, use a terminal output instead of a window
     #[structopt(short = "t", long = "terminal")]
     terminal: bool,
+
+    /// If present, does not do any rendering. Useful for debugging the opcodes
+    #[structopt(long = "no_output")]
+    no_output: bool,
 
     /// The gameboy (.gb) rom that you want to play
     #[structopt(parse(from_os_str))]
@@ -24,7 +28,9 @@ fn main() {
     use std::io::Read;
     let opts = Opts::from_args();
 
-    let mut video: Box<dyn Video> = if opts.terminal {
+    let mut video: Box<dyn Video> = if opts.no_output {
+        Box::new(video::NoOutput)
+    } else if opts.terminal {
         Box::new(video::TerminalVideo::init())
     } else {
         Box::new(video::MinifbVideo::init())
@@ -71,7 +77,6 @@ fn main() {
     let mut last_frame_start = Instant::now();
     let target_frame_time = Duration::from_millis(1000 / TARGET_FPS as u64);
 
-    println!("Update frame");
     memory.video.render();
 
     while memory.video.is_running() {
@@ -80,11 +85,10 @@ fn main() {
         memory.update_scanline(&mut cpu.scanline_cycles);
 
         if cpu.frame_elapsed(TARGET_FPS) {
-            println!("Update frame");
             memory.video.render();
 
             let diff = Instant::now().duration_since(last_frame_start);
-            if target_frame_time > diff {
+            if target_frame_time > diff && !opts.no_output {
                 let sleep_time = target_frame_time - diff;
                 std::thread::sleep(sleep_time);
             }

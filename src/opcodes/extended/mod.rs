@@ -166,7 +166,7 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x84 RES 0,H28- - - -),
     unimpl_opcode!(0x85 RES 0,L28- - - -),
     unimpl_opcode!(0x86 RES 0,(HL)216- - - -),
-    unimpl_opcode!(0x87 RES 0,A28- - - -),
+    ("0x87 RES 0, A", bit::res_0_a),
     unimpl_opcode!(0x88 RES 1,B28- - - -),
     unimpl_opcode!(0x89 RES 1,C28- - - -),
     unimpl_opcode!(0x8A RES 1,D28- - - -),

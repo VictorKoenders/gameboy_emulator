@@ -25,10 +25,6 @@ pub fn execute(memory: &mut Memory, cpu: &mut Cpu) {
     let (_name, function) = INSTRUCTIONS[instruction as usize];
 
     (function)(memory, cpu);
-
-    if cpu.program_counter() == 0x0100 {
-        memory.disable_bios();
-    }
 }
 
 pub type Op = fn(memory: &mut Memory, cpu: &mut Cpu);
@@ -63,7 +59,7 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     ("0x13 INC DE", add::inc_de),
     unimpl_opcode!(0x14 INC D 1 4 Z 0 H -),
     ("0x15 DEC D", sub::dec_d),
-    unimpl_opcode!(0x16 LD D,d8 2 8 - - - -),
+    ("0x16 LD D, d8", loads::ld_d_d8),
     ("0x17 RLA", misc::rla),
     ("JR r8", jumps::jr_r8),
     unimpl_opcode!(0x19 ADD HL,DE 1 8 - 0 H C),
@@ -115,7 +111,7 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x44 LD B,H 1 4 - - - -),
     unimpl_opcode!(0x45 LD B,L 1 4 - - - -),
     unimpl_opcode!(0x46 LD B,(HL)1 8 - - - -),
-    unimpl_opcode!(0x47 LD B,A 1 4 - - - -),
+    ("0x47 LD B, A", loads::ld_b_a),
     unimpl_opcode!(0x48 LD C,B 1 4 - - - -),
     unimpl_opcode!(0x49 LD C,C 1 4 - - - -),
     unimpl_opcode!(0x4A LD C,D 1 4 - - - -),
@@ -167,12 +163,12 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0x75 LD (HL),L18- - - -),
     unimpl_opcode!(0x76 HALT14- - - -),
     ("LD (HL),A", loads::ld_ptr_hl_a),
-    unimpl_opcode!(0x78 LD A,B14- - - -),
+    ("0x78 LD A, B", loads::ld_a_b),
     unimpl_opcode!(0x79 LD A,C14- - - -),
     unimpl_opcode!(0x7A LD A,D14- - - -),
     ("0x7B LD A, E", loads::ld_a_e),
     ("0x7C LD A, H", loads::ld_a_h),
-    unimpl_opcode!(0x7D LD A,L14- - - -),
+    ("0x7D LD A, L", loads::ld_a_l),
     unimpl_opcode!(0x7E LD A,(HL)18- - - -),
     unimpl_opcode!(0x7F LD A,A14- - - -),
     // 0x8x
@@ -182,7 +178,7 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     ("ADD a, e", add::add_a_e),
     unimpl_opcode!(0x84 ADD A,H 1 4 Z 0 H C),
     unimpl_opcode!(0x85 ADD A,L 1 4 Z 0 H C),
-    unimpl_opcode!(0x86 ADD A,(HL) 1 8 Z 0 H C),
+    ("0x86 ADD A, (HL)", add::add_a_ptr_hl),
     unimpl_opcode!(0x87 ADD A,A 1 4 Z 0 H C),
     ("ADC a, b", add::adc_a_b),
     ("ADC a, c", add::adc_a_c),
@@ -241,7 +237,7 @@ const INSTRUCTIONS: [(&str, Op); 256] = [
     unimpl_opcode!(0xBB CP E14Z 1 H C),
     unimpl_opcode!(0xBC CP H14Z 1 H C),
     unimpl_opcode!(0xBD CP L14Z 1 H C),
-    unimpl_opcode!(0xBE CP (HL)18Z 1 H C),
+    ("0xBE CP (HL)", cmp::cp_ptr_hl),
     unimpl_opcode!(0xBF CP A14Z 1 H C),
     // 0xCx
     unimpl_opcode!(0xC0 RET NZ 1 20/8 - - - -),

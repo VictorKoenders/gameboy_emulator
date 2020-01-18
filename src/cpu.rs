@@ -76,6 +76,9 @@ impl Cpu {
     pub fn h(&self) -> u8 {
         self.h
     }
+    pub fn l(&self) -> u8 {
+        self.l
+    }
 
     pub fn af(&self) -> u16 {
         bytes_to_word(self.a, self.f)

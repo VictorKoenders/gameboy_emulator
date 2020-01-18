@@ -254,3 +254,42 @@ pub fn ld_a_h(_: &mut Memory, cpu: &mut Cpu) {
     let val = cpu.h();
     cpu.set_h(val);
 }
+
+pub fn ld_d_d8(memory: &mut Memory, cpu: &mut Cpu) {
+    // 0x16 LD D, d8 2 8 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(8);
+
+    let val = memory.read_byte(cpu.program_counter());
+    cpu.increment_program_counter();
+
+    cpu.set_d(val);
+}
+
+pub fn ld_a_l(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x7D LD A, L 1 4 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(4);
+
+    let val = cpu.l();
+    cpu.set_a(val);
+}
+
+pub fn ld_a_b(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x78 LD A, B 1 4 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(4);
+
+    let val = cpu.b();
+    cpu.set_a(val);
+}
+
+pub fn ld_b_a(_: &mut Memory, cpu: &mut Cpu) {
+    // 0x47 LD B, A 1 4 - - - -
+    cpu.increment_program_counter();
+    cpu.clock_cycles(4);
+
+    let val = cpu.a();
+    cpu.set_b(val);
+}
+

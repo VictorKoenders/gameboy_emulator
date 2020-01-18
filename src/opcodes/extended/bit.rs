@@ -10,6 +10,26 @@ pub fn bit_7_h(_memory: &mut Memory, cpu: &mut Cpu) {
     cpu.flags.set_half_carry();
 }
 
+macro_rules! impl_res {
+    ($($code:tt $name:ident $bit:tt $field:tt $set_field:tt),* $(,)?) => {
+        $(
+            pub fn $name(_: &mut Memory, cpu: &mut Cpu) {
+                // $code RES $bit $field 1 4 - - - -
+                cpu.increment_program_counter();
+                cpu.clock_cycles(4);
+
+                let mut val = cpu.$field();
+                val &= !(1 << $bit);
+                cpu.$set_field(val);
+            }
+        )*
+    }
+}
+
+impl_res! {
+    0x87 res_0_a 0 a set_a,
+}
+
 fn bit_cleared(value: u8, offset: i8) -> bool {
     !bit_set(value, offset)
 }

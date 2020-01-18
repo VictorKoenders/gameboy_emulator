@@ -161,10 +161,6 @@ impl<'a> Memory<'a> {
         }
     }
 
-    pub fn disable_bios(&mut self) {
-        self.bios_loaded = false;
-    }
-
     pub fn read_byte(&self, address: u16) -> u8 {
         if self.bios_loaded && address < 0x0100 {
             BIOS[address as usize]
@@ -206,10 +202,11 @@ impl<'a> Memory<'a> {
                 REGISTER_SOUND_SELECTION => println!("Sound selection {:?}", SoundSelection(value)),
                 REGISTER_SOUND_ENABLE => println!("Sound {:?}", SoundEnable(value)),
                 REGISTER_LCD_CONTROL => println!("{:?}", LcdControl(value)),
-                REGISTER_SCROLL_POSITION_Y => println!("Writing scroll position y {:?}", value),
+                REGISTER_SCROLL_POSITION_Y => {} // Writing scroll position y
                 REGISTER_BACKGROUND_PALETTE => {
                     println!("Background palette {:?}", BackgroundPalette(value))
                 }
+                REGISTER_DISABLE_BIOS => { self.bios_loaded = false; }
                 _ => todo!(
                     "Writing to hardware register 0x{:04X} (value 0x{:02X})",
                     address,
